@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dumb Quotes Billboard</title>
     <style>
-        /* ... (CSS remains mostly the same, ensuring styles for form and delete buttons exist) ... */
         * {
             margin: 0;
             padding: 0;
@@ -145,7 +144,6 @@
 
         .form-group {
             margin-bottom: 20px;
-            text-align: left; /* Ensure form labels align left */
         }
 
         label {
@@ -153,6 +151,7 @@
             color: #667eea;
             font-weight: bold;
             margin-bottom: 8px;
+            text-align: left;
         }
 
         input, textarea {
@@ -162,6 +161,7 @@
             border-radius: 10px;
             font-size: 1em;
             transition: border 0.3s;
+            text-align: left; /* Ensure input text is left-aligned */
         }
 
         input:focus, textarea:focus {
@@ -185,11 +185,16 @@
             font-weight: bold;
             width: 100%;
             transition: transform 0.3s;
-            margin-top: 10px; /* Added spacing */
         }
 
         .submit-btn:hover, .login-btn:hover {
             transform: scale(1.05);
+        }
+        
+        .login-error {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-top: 10px;
         }
 
         .quotes-grid {
@@ -337,25 +342,21 @@
     </div>
 
     <script>
+        // --- Configuration ---
+        const ADMIN_USERNAME = "admin@billboard.com";
+        const ADMIN_PASSWORD = "dumbpassword"; 
+        
+        // --- State Variables ---
         let quotes = [];
-        // loggedInUser is now the unique username (e.g., "user@example.com")
-        let loggedInUser = localStorage.getItem('loggedInUser') || null;
-
-        // --- Configuration (Simulated Backend) ---
-        // In a real application, this would be validated by a server.
-        // We simulate that any user can log in with a fixed dummy password.
-        const SIMULATED_PASSWORD = 'password123'; 
+        // loggedInUser stores the username (email)
+        let loggedInUser = localStorage.getItem('loggedInUser') || null; 
 
         // --- Core Data Functions ---
 
         function loadQuotes() {
             const saved = localStorage.getItem('dumbQuotes');
             if (saved) {
-                // Ensure submitter field exists for older quotes
-                quotes = JSON.parse(saved).map(q => ({
-                    ...q,
-                    submitter: q.submitter || 'Anonymous' 
-                }));
+                quotes = JSON.parse(saved);
             }
             updateAllDisplays();
         }
@@ -369,42 +370,45 @@
         function updateLoginStatus() {
             const statusDiv = document.getElementById('userStatus');
             if (loggedInUser) {
-                // Display the email/username
-                statusDiv.innerHTML = `Welcome, **${loggedInUser}**! <button class="logout-btn" onclick="logout()">Logout</button>`;
+                // Display the logged in user's email
+                statusDiv.innerHTML = `Logged in as: **${loggedInUser}** <button class="logout-btn" onclick="logout()">Logout</button>`;
             } else {
                 statusDiv.innerHTML = 'Not Logged In.';
             }
-            // Refresh displays that depend on user status
             updateAddPage(); 
             updateAllQuotes(); 
         }
-        
-        function login(username, password) {
-            // 1. Validate username format
-            if (!username.includes('@') || username.length < 5) {
-                alert("Login failed: Username must resemble an email (contain '@').");
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            // 1. Check for @ symbol
+            if (!username.includes('@')) {
+                errorDiv.textContent = "Username must be an email address (contain '@').";
                 return;
             }
-            
-            // 2. Validate password (simulated check)
-            if (password !== SIMULATED_PASSWORD) {
-                 alert("Login failed: Invalid password. (Hint: 'password123')");
-                 return;
+
+            // 2. Check against the fixed account
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                // Success: Log the user in
+                loggedInUser = username;
+                localStorage.setItem('loggedInUser', username);
+                updateLoginStatus();
+                alert(`Welcome, ${username}! You can now add and delete your quotes.`);
+                showPage('home');
+            } else {
+                // Failure
+                errorDiv.textContent = "Invalid username or password. (Hint: Try admin@billboard.com / dumbpassword)";
             }
-            
-            // 3. Login successful
-            loggedInUser = username;
-            localStorage.setItem('loggedInUser', username);
-            updateLoginStatus();
-            alert(`Logged in as ${username}!`);
-            showPage('home'); 
         }
 
         function logout() {
             loggedInUser = null;
             localStorage.removeItem('loggedInUser');
             updateLoginStatus();
-            alert("You have been logged out.");
             showPage('home');
         }
 
@@ -426,7 +430,7 @@
                 author: author,
                 votes: 0,
                 date: new Date().toISOString(),
-                // Store the unique username/email as the submitter
+                // Store the submitter's username (email)
                 submitter: loggedInUser 
             };
             
@@ -455,16 +459,15 @@
             if (quoteIndex > -1) {
                 const quote = quotes[quoteIndex];
                 
-                // CRITICAL CHECK: User must be logged in AND must be the submitter (matching username/email)
-                if (loggedInUser && loggedInUser === quote.submitter) {
+                // Check if the user is logged in AND is the submitter
+                if (loggedInUser === quote.submitter) {
                     if (confirm(`Are you sure you want to delete this quote by ${quote.author}?`)) {
                         quotes.splice(quoteIndex, 1);
                         saveQuotes();
                         updateAllDisplays();
-                        alert('Quote deleted.');
                     }
                 } else {
-                    alert('Deletion failed. You can only delete quotes you have submitted.');
+                    alert('You can only delete quotes you have submitted.');
                 }
             }
         }
@@ -477,6 +480,7 @@
             
             document.getElementById(pageName).classList.add('active');
 
+            // Find the button corresponding to the pageName and activate it
             const activeBtn = document.querySelector(`.nav-btn[onclick*="showPage('${pageName}')"]`);
             if (activeBtn) {
                 activeBtn.classList.add('active');
@@ -491,11 +495,11 @@
             const addContent = document.getElementById('addContent');
             
             if (loggedInUser) {
-                // Show the Add Quote Form (available only to logged-in users)
+                // Show the Add Quote Form
                 addContent.innerHTML = `
                     <div class="add-quote-form">
                         <h2 style="color: #667eea; margin-bottom: 20px;">Submit a Dumb Quote</h2>
-                        <p style="text-align: center; color: #555;">Submitting as: **${loggedInUser}**</p>
+                        <p style="text-align: center; color: #764ba2;">Posting as: **${loggedInUser}**</p>
                         <form onsubmit="addQuote(event)">
                             <div class="form-group">
                                 <label>Quote:</label>
@@ -510,29 +514,24 @@
                     </div>
                 `;
             } else {
-                // Show the Login Page (for users who are not logged in)
+                // Show the Login Page with username/password fields
                 addContent.innerHTML = `
                     <div class="login-page">
-                        <h2>Login Required to Add Quotes 🔐</h2>
-                        <p style="margin-bottom: 20px; color: #555;">Please log in with your email and password to contribute.</p>
-                        <form onsubmit="event.preventDefault(); 
-                            const u = document.getElementById('loginUsername').value;
-                            const p = document.getElementById('loginPassword').value;
-                            login(u, p);">
-                            
+                        <h2>Login Required to Add Quotes</h2>
+                        <p style="margin-bottom: 20px; color: #555;">Log in to share your favorite dumb moments and manage your submissions.</p>
+                        <form onsubmit="handleLogin(event)">
                             <div class="form-group">
-                                <label for="loginUsername">Username (must contain @):</label>
+                                <label for="loginUsername">Username (Email):</label>
                                 <input type="text" id="loginUsername" required placeholder="e.g., yourname@example.com">
                             </div>
-                            
                             <div class="form-group">
                                 <label for="loginPassword">Password:</label>
-                                <input type="password" id="loginPassword" required placeholder="Enter your password">
+                                <input type="password" id="loginPassword" required placeholder="Your secret password">
                             </div>
-                            
-                            <button type="submit" class="login-btn">Login</button>
+                            <button type="submit" class="login-btn">Log In</button>
+                            <div id="loginError" class="login-error"></div>
                             <p style="margin-top: 15px; font-size: 0.9em; color: #777;">
-                                *Note: This is a client-side simulation. Use any email format for username and 'password123' for password.*
+                                *Hint: Use **admin@billboard.com** and **dumbpassword** to test. This is not secure.*
                             </p>
                         </form>
                     </div>
@@ -540,16 +539,44 @@
             }
         }
 
-        // Billboards logic (updateBillboards) remains the same...
+        function updateAllDisplays() {
+            updateBillboards();
+            updateAllQuotes();
+        }
+
+        function updateBillboards() {
+            // ... (Billboard logic remains the same)
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            
+            const weekQuotes = quotes.filter(q => new Date(q.date) >= weekAgo);
+            const weekWinner = weekQuotes.sort((a, b) => b.votes - a.votes)[0];
+            
+            const allTimeWinner = [...quotes].sort((a, b) => b.votes - a.votes)[0];
+            
+            document.getElementById('weekBillboard').innerHTML = weekWinner ? 
+                `<div class="billboard-quote">"${weekWinner.text}"</div>
+                 <div class="billboard-author">— ${weekWinner.author}</div>
+                 <div class="billboard-votes">🔥 ${weekWinner.votes} votes</div>` :
+                '<div class="empty-state">No quotes this week yet!</div>';
+            
+            document.getElementById('allTimeBillboard').innerHTML = allTimeWinner ?
+                `<div class="billboard-quote">"${allTimeWinner.text}"</div>
+                 <div class="billboard-author">— ${allTimeWinner.author}</div>
+                 <div class="billboard-votes">🔥 ${allTimeWinner.votes} votes</div>` :
+                '<div class="empty-state">No quotes yet!</div>';
+        }
 
         function updateAllQuotes() {
             const sorted = [...quotes].sort((a, b) => b.votes - a.votes);
             
             const quoteHTML = sorted.map(quote => {
                 // Check if the current loggedInUser submitted this quote
-                const isSubmitter = loggedInUser && loggedInUser === quote.submitter;
+                // Use a generic placeholder if submitter is missing (from old data)
+                const submitterEmail = quote.submitter || ''; 
+                const isSubmitter = loggedInUser && loggedInUser === submitterEmail;
                 
-                // Render the Delete button only if the user is the submitter
+                // Show delete button only if the user is the submitter
                 const deleteButton = isSubmitter ? 
                     `<button class="delete-btn" onclick="deleteQuote(${quote.id})">Delete 🗑️</button>` : '';
 
@@ -570,6 +597,7 @@
 
             const emptyState = '<div class="empty-state">No quotes yet! Be the first to add one!</div>';
             
+            // Target both display areas
             const homeContainer = document.getElementById('homeQuotes');
             const allContainer = document.getElementById('allQuotes');
             
@@ -582,9 +610,8 @@
             homeContainer.innerHTML = quoteHTML;
             allContainer.innerHTML = quoteHTML;
         }
-
-        // Initialize App
-        // loadQuotes() and updateLoginStatus() are called in the body tag onload
+        
+        // Initial load called by <body> onload
     </script>
 </body>
 </html>
