@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dumb Quotes Billboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .tagline {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .nav-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        .nav-btn.active {
+            background: #764ba2;
+            color: white;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .billboard {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            color: white;
+        }
+
+        .billboard h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .billboard-quote {
+            background: rgba(255,255,255,0.2);
+            padding: 25px;
+            border-radius: 15px;
+            font-size: 1.3em;
+            font-style: italic;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .billboard-author {
+            text-align: right;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+
+        .billboard-votes {
+            text-align: center;
+            font-size: 1em;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        .add-quote-form, .login-page {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            max-width: 500px;
+            margin: 0 auto 30px auto;
+        }
+        
+        .login-page {
+            text-align: center;
+            padding: 50px 30px;
+        }
+        
+        .login-page h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .submit-btn, .login-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            width: 100%;
+            transition: transform 0.3s;
+        }
+
+        .submit-btn:hover, .login-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .quotes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .quote-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .quote-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .quote-text {
+            font-size: 1.1em;
+            font-style: italic;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .quote-author {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .quote-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between; /* Adjusted for delete button */
+        }
+        
+        .vote-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .vote-btn, .delete-btn {
+            background: #f093fb;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+        
+        .delete-btn {
+            background: #e74c3c;
+            order: 2; /* Move delete button to the right */
+        }
+
+        .vote-btn:hover {
+            background: #f5576c;
+        }
+        
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+
+        .vote-count {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 60px 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+        }
+        
+        .user-status {
+            text-align: right;
+            margin-bottom: 10px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 0.9em;
+        }
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body onload="loadQuotes(); updateLoginStatus();">
+    <div class="container">
+        <header>
+            <div id="userStatus" class="user-status"></div>
+            <h1>🎭 Dumb Quotes Billboard 🎭</h1>
+            <p class="tagline">Celebrating humanity's finest moments of brilliance... NOT!</p>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" onclick="showPage('home')">Home</button>
+            <button class="nav-btn" onclick="showPage('add')">Add Quote</button>
+            <button class="nav-btn" onclick="showPage('all')">View All</button>
+        </nav>
+
+        <div id="home" class="page active">
+            <div class="billboard">
+                <h2>🏆 Dumbest of the Week 🏆</h2>
+                <div id="weekBillboard"></div>
+            </div>
+
+            <div class="billboard">
+                <h2>👑 Dumbest of All Time 👑</h2>
+                <div id="allTimeBillboard"></div>
+            </div>
+
+            <h2 style="color: white; margin: 40px 0 20px 0; text-align: center;">All Dumb Quotes</h2>
+            <div id="homeQuotes" class="quotes-grid"></div>
+        </div>
+
+        <div id="add" class="page">
+            <div id="addContent"></div>
+        </div>
+
+        <div id="all" class="page">
+            <h2 style="color: white; margin-bottom: 20px; text-align: center;">All Dumb Quotes</h2>
+            <div id="allQuotes" class="quotes-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        let quotes = [];
+        let loggedInUser = localStorage.getItem('loggedInUser') || null;
+
+        // --- Core Data Functions ---
+
+        function loadQuotes() {
+            const saved = localStorage.getItem('dumbQuotes');
+            if (saved) {
+                quotes = JSON.parse(saved);
+            }
+            updateAllDisplays();
+        }
+
+        function saveQuotes() {
+            localStorage.setItem('dumbQuotes', JSON.stringify(quotes));
+        }
+        
+        // --- Authentication Simulation ---
+
+        function updateLoginStatus() {
+            const statusDiv = document.getElementById('userStatus');
+            if (loggedInUser) {
+                statusDiv.innerHTML = `Welcome, **${loggedInUser}**! <button class="logout-btn" onclick="logout()">Logout</button>`;
+            } else {
+                statusDiv.innerHTML = 'Not Logged In.';
+            }
+            // Ensure the 'Add Quote' page content is refreshed based on login status
+            updateAddPage(); 
+            // Also refresh quotes to show/hide delete buttons
+            updateAllQuotes(); 
+        }
+
+        function simulateLogin(username) {
+            loggedInUser = username;
+            localStorage.setItem('loggedInUser', username);
+            updateLoginStatus();
+            showPage('home'); 
+        }
+
+        function logout() {
+            loggedInUser = null;
+            localStorage.removeItem('loggedInUser');
+            updateLoginStatus();
+            showPage('home');
+        }
+
+        // --- Quote Management Functions ---
+
+        function addQuote(e) {
+            e.preventDefault();
+            if (!loggedInUser) {
+                alert("You must be logged in to add a quote.");
+                return;
+            }
+
+            const text = document.getElementById('quoteText').value;
+            const author = document.getElementById('quoteAuthor').value;
+            
+            const quote = {
+                id: Date.now(),
+                text: text,
+                author: author,
+                votes: 0,
+                date: new Date().toISOString(),
+                // Assign the quote to the currently logged-in user
+                submitter: loggedInUser 
+            };
+            
+            quotes.push(quote);
+            saveQuotes();
+            updateAllDisplays();
+            
+            document.getElementById('quoteText').value = '';
+            document.getElementById('quoteAuthor').value = '';
+            
+            alert('Quote added successfully! 🎉');
+            showPage('all');
+        }
+
+        function voteQuote(id) {
+            const quote = quotes.find(q => q.id === id);
+            if (quote) {
+                quote.votes++;
+                saveQuotes();
+                updateAllDisplays();
+            }
+        }
+        
+        function deleteQuote(id) {
+            const quoteIndex = quotes.findIndex(q => q.id === id);
+            if (quoteIndex > -1) {
+                const quote = quotes[quoteIndex];
+                // Check if the user is logged in AND is the submitter
+                if (loggedInUser === quote.submitter) {
+                    if (confirm(`Are you sure you want to delete this quote by ${quote.author}?`)) {
+                        quotes.splice(quoteIndex, 1);
+                        saveQuotes();
+                        updateAllDisplays();
+                        alert('Quote deleted.');
+                    }
+                } else {
+                    alert('You can only delete quotes you have submitted.');
+                }
+            }
+        }
+
+        // --- UI Rendering Functions ---
+
+        function showPage(pageName) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(pageName).classList.add('active');
+
+            // Find the button corresponding to the pageName and activate it
+            const activeBtn = document.querySelector(`.nav-btn[onclick*="showPage('${pageName}')"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+            
+            // Special handling for the 'add' page
+            if (pageName === 'add') {
+                updateAddPage();
+            }
+        }
+        
+        function updateAddPage() {
+            const addContent = document.getElementById('addContent');
+            
+            if (loggedInUser) {
+                // Show the Add Quote Form
+                addContent.innerHTML = `
+                    <div class="add-quote-form">
+                        <h2 style="color: #667eea; margin-bottom: 20px;">Submit a Dumb Quote</h2>
+                        <form onsubmit="addQuote(event)">
+                            <div class="form-group">
+                                <label>Quote:</label>
+                                <textarea id="quoteText" required placeholder="Enter the hilariously dumb quote..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Who said it? (Author):</label>
+                                <input type="text" id="quoteAuthor" required placeholder="Name of the person">
+                            </div>
+                            <button type="submit" class="submit-btn">Add Quote</button>
+                        </form>
+                    </div>
+                `;
+            } else {
+                // Show the Login Page
+                addContent.innerHTML = `
+                    <div class="login-page">
+                        <h2>Login Required to Add Quotes</h2>
+                        <p style="margin-bottom: 20px; color: #555;">Please log in to share your favorite dumb moments.</p>
+                        <form onsubmit="event.preventDefault(); simulateLogin(document.getElementById('loginUsername').value);">
+                            <div class="form-group">
+                                <label for="loginUsername">Enter a Username (e.g., Your Name):</label>
+                                <input type="text" id="loginUsername" required placeholder="Choose a username">
+                            </div>
+                            <button type="submit" class="login-btn">Simulate Login</button>
+                            <p style="margin-top: 15px; font-size: 0.9em; color: #777;">*Note: This is a client-side simulation. No actual password is required.*</p>
+                        </form>
+                    </div>
+                `;
+            }
+        }
+
+        function updateAllDisplays() {
+            updateBillboards();
+            updateAllQuotes(); // This now updates both homeQuotes and allQuotes
+        }
+
+        function updateBillboards() {
+            // ... (Billboard logic remains the same)
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            
+            const weekQuotes = quotes.filter(q => new Date(q.date) >= weekAgo);
+            const weekWinner = weekQuotes.sort((a, b) => b.votes - a.votes)[0];
+            
+            const allTimeWinner = [...quotes].sort((a, b) => b.votes - a.votes)[0];
+            
+            document.getElementById('weekBillboard').innerHTML = weekWinner ? 
+                `<div class="billboard-quote">"${weekWinner.text}"</div>
+                 <div class="billboard-author">— ${weekWinner.author}</div>
+                 <div class="billboard-votes">🔥 ${weekWinner.votes} votes</div>` :
+                '<div class="empty-state">No quotes this week yet!</div>';
+            
+            document.getElementById('allTimeBillboard').innerHTML = allTimeWinner ?
+                `<div class="billboard-quote">"${allTimeWinner.text}"</div>
+                 <div class="billboard-author">— ${allTimeWinner.author}</div>
+                 <div class="billboard-votes">🔥 ${allTimeWinner.votes} votes</div>` :
+                '<div class="empty-state">No quotes yet!</div>';
+        }
+
+        function updateAllQuotes() {
+            const sorted = [...quotes].sort((a, b) => b.votes - a.votes);
+            
+            const quoteHTML = sorted.map(quote => {
+                // Check if the current loggedInUser submitted this quote
+                const isSubmitter = loggedInUser && loggedInUser === quote.submitter;
+                
+                const deleteButton = isSubmitter ? 
+                    `<button class="delete-btn" onclick="deleteQuote(${quote.id})">Delete 🗑️</button>` : '';
+
+                return `
+                    <div class="quote-card">
+                        <div class="quote-text">"${quote.text}"</div>
+                        <div class="quote-author">— ${quote.author}</div>
+                        <div class="quote-actions">
+                            <div class="vote-actions">
+                                <button class="vote-btn" onclick="voteQuote(${quote.id})">Vote as Dumb 🤦</button>
+                                <span class="vote-count">${quote.votes} votes</span>
+                            </div>
+                            ${deleteButton}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const emptyState = '<div class="empty-state">No quotes yet! Be the first to add one!</div>';
+            
+            // Target both display areas
+            const homeContainer = document.getElementById('homeQuotes');
+            const allContainer = document.getElementById('allQuotes');
+            
+            if (quotes.length === 0) {
+                homeContainer.innerHTML = emptyState;
+                allContainer.innerHTML = emptyState;
+                return;
+            }
+            
+            homeContainer.innerHTML = quoteHTML;
+            allContainer.innerHTML = quoteHTML;
+        }
+
+        // Initialize App
+        // loadQuotes() is called in the body tag onload
+        // updateLoginStatus() is called in the body tag onload
+    </script>
+</body>
+</html>
