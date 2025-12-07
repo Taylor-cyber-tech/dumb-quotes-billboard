@@ -49,7 +49,7 @@
         .login-page { text-align:center; padding: 40px 30px; }
         .login-page h2 { color: #764ba2; margin-bottom: 20px; }
 
-        .form-group { margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; text-align: left; }
         label { display:block; color:#667eea; font-weight:bold; margin-bottom:8px; }
         input, textarea {
             width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:10px; font-size:1em;
@@ -73,24 +73,14 @@
             transition: transform 0.3s;
         }
         .quote-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
-        .quote-text { font-size: 1.1em; font-style: italic; color: #333; margin-bottom: 15px; }
-        .quote-author { color: #667eea; font-weight:bold; margin-bottom: 15px; }
-        .quote-actions { display:flex; gap:10px; align-items:center; justify-content:space-between; }
-        .vote-actions { display:flex; gap:10px; align-items:center; }
-
         .vote-btn, .delete-btn { background:#f093fb; color:white; border:none; padding:8px 15px; border-radius:20px;
             cursor:pointer; font-size:0.9em; transition: background 0.3s; }
         .vote-btn[disabled] { opacity: 0.55; cursor: not-allowed; transform: none; }
-        .delete-btn { background: #e74c3c; order: 2; }
+        .delete-btn { background: #e74c3c; margin-left: auto; }
         .vote-btn:hover:not([disabled]) { background:#f5576c; }
         .delete-btn:hover { background:#c0392b; }
-
-        .vote-count { color:#667eea; font-weight:bold; }
         .empty-state { text-align:center; color:white; font-size:1.2em; padding:60px 20px; background: rgba(255,255,255,0.1); border-radius:20px; }
         .user-status { text-align:right; margin-bottom:10px; color:white; font-weight:bold; }
-        .logout-btn { background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:10px; cursor:pointer; margin-left:10px; font-size:0.9em; }
-        .logout-btn:hover { background:#c0392b; }
-        .muted { color:#666; font-size:0.95em; }
     </style>
 </head>
 <body onload="initApp();">
@@ -133,702 +123,367 @@
     </div>
 
     <script>
-        // ---------- App State ----------
+        // =========================
+        //  APP STATE + STORAGE
+        // =========================
+
         let quotes = [];
+        let accounts = []; // [{username:"x",password:"y"}]
+        let userVotes = {}; // { username: [quoteIds] }
         let loggedInUser = null;
-        let accounts = [];          // list of usernames
-        let userVotes = {};         // structure: { username: [quoteId, ...] }
 
-        // ---------- Persistence ----------
-        function loadFromStorage() {
-            const q = localStorage.getItem('dumbQuotes');
-            quotes = q ? JSON.parse(q) : [];
-
-            const a = localStorage.getItem('accounts');
-            accounts = a ? JSON.parse(a) : [];
-
-            const uv = localStorage.getItem('userVotes');
-            userVotes = uv ? JSON.parse(uv) : {};
-
-            const lu = localStorage.getItem('loggedInUser');
-            loggedInUser = lu ? lu : null;
+        function loadStorage() {
+            quotes = JSON.parse(localStorage.getItem("dumbQuotes") || "[]");
+            accounts = JSON.parse(localStorage.getItem("accounts") || "[]");
+            userVotes = JSON.parse(localStorage.getItem("userVotes") || "{}");
+            loggedInUser = localStorage.getItem("loggedInUser") || null;
         }
 
-        function saveToStorage() {
-            localStorage.setItem('dumbQuotes', JSON.stringify(quotes));
-            localStorage.setItem('accounts', JSON.stringify(accounts));
-            localStorage.setItem('userVotes', JSON.stringify(userVotes));
-            if (loggedInUser) localStorage.setItem('loggedInUser', loggedInUser);
-            else localStorage.removeItem('loggedInUser');
+        function saveStorage() {
+            localStorage.setItem("dumbQuotes", JSON.stringify(quotes));
+            localStorage.setItem("accounts", JSON.stringify(accounts));
+            localStorage.setItem("userVotes", JSON.stringify(userVotes));
+
+            if (loggedInUser)
+                localStorage.setItem("loggedInUser", loggedInUser);
+            else
+                localStorage.removeItem("loggedInUser");
         }
 
-        // ---------- Init ----------
         function initApp() {
-            loadFromStorage();
+            loadStorage();
             updateLoginStatus();
             updateAllDisplays();
         }
 
-        // ---------- Authentication ----------
+        // =========================
+        //      PASSWORD HASH
+        // =========================
+
+        // simple safe local hash for browser projects (Base64)
+        function hashPassword(str) {
+            return btoa(str); 
+        }
+
+        // =========================
+        //      LOGIN STATUS BAR
+        // =========================
+
         function updateLoginStatus() {
-            const statusDiv = document.getElementById('userStatus');
+            const bar = document.getElementById("userStatus");
+
             if (loggedInUser) {
-                statusDiv.innerHTML = `Welcome, <strong>${escapeHtml(loggedInUser)}</strong>! <button class="logout-btn" onclick="logout()">Logout</button>`;
+                bar.innerHTML = `Logged in as <b>${escapeHtml(loggedInUser)}</b> 
+                    <button onclick="logout()" style="background:#e74c3c;color:white;border:none;padding:5px 10px;border-radius:8px;cursor:pointer;margin-left:10px;">Logout</button>`;
             } else {
-                statusDiv.innerHTML = `<span class="muted">Not Logged In.</span>`;
+                bar.innerHTML = `<span style="opacity:0.9;">Not Logged In</span>`;
             }
+
             updateAddPage();
             updateAllQuotes();
         }
 
-        function simulateLogin(username) {
-            if (!username) {
-                alert("Please enter a username.");
-                return;
-            }
-            loggedInUser = username;
-            if (!accounts.includes(username)) {
-                accounts.push(username);
-                alert("Account created and logged in as: " + username);
-            } else {
-                alert("Logged in as: " + username);
-            }
-            saveToStorage();
-            updateLoginStatus();
-            showPage('home');
-        }
-
         function logout() {
             loggedInUser = null;
-            saveToStorage();
+            saveStorage();
             updateLoginStatus();
-            showPage('home');
+            showPage("home");
         }
 
-        // Called when user submits register/login form
-        function registerOrLogin() {
-            const input = document.getElementById('loginUsername');
-            const username = input ? input.value.trim() : '';
-            if (!username) {
-                alert("Enter a username.");
+        // =========================
+        //      SHOW PAGES
+        // =========================
+
+        function showPage(name) {
+            document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+            document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+
+            document.getElementById(name).classList.add("active");
+
+            const btn = document.querySelector(`.nav-btn[onclick="showPage('${name}')"]`);
+            if (btn) btn.classList.add("active");
+
+            if (name === "add") updateAddPage();
+        }
+
+        // =========================
+        //      REGISTER + LOGIN
+        // =========================
+
+        function updateAddPage() {
+            const div = document.getElementById("addContent");
+
+            if (!loggedInUser) {
+                div.innerHTML = `
+                    <div class="login-page">
+                        <h2>Login / Create Account</h2>
+                        <form onsubmit="event.preventDefault(); registerOrLogin();">
+                            <div class="form-group">
+                                <label>Username:</label>
+                                <input id="loginUsername" type="text" required placeholder="Choose a username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password:</label>
+                                <input id="loginPassword" type="password" required placeholder="Enter a password">
+                            </div>
+                            <button class="login-btn" type="submit">Continue</button>
+                            <p style="font-size:0.9em;margin-top:10px;color:#555;">
+                                *Accounts stored safely in your browser*
+                            </p>
+                        </form>
+                    </div>
+                `;
                 return;
             }
-            simulateLogin(username);
+
+            // if logged in
+            div.innerHTML = `
+                <div class="add-quote-form">
+                    <h2 style="color:#667eea;margin-bottom:20px;">Submit a Dumb Quote</h2>
+                    <form onsubmit="addQuote(event)">
+                        <div class="form-group">
+                            <label>Quote:</label>
+                            <textarea id="quoteText" required placeholder="Enter the dumb quote..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Author:</label>
+                            <input id="quoteAuthor" type="text" placeholder="Who said it?">
+                        </div>
+                        <button class="submit-btn" type="submit">Add Quote</button>
+                    </form>
+                </div>
+            `;
         }
 
-        // ---------- Quotes CRUD ----------
+        function registerOrLogin() {
+            const username = document.getElementById("loginUsername").value.trim();
+            const password = document.getElementById("loginPassword").value.trim();
+
+            if (!username || !password) {
+                alert("Please fill all fields.");
+                return;
+            }
+
+            const hashed = hashPassword(password);
+            let account = accounts.find(acc => acc.username === username);
+
+            if (!account) {
+                // Create new account
+                accounts.push({ username, password: hashed });
+                loggedInUser = username;
+                alert("Account created! Logged in.");
+            } else {
+                // Login attempt
+                if (account.password !== hashed) {
+                    alert("Incorrect password ❌");
+                    return;
+                }
+                loggedInUser = username;
+                alert("Logged in successfully ✔️");
+            }
+
+            saveStorage();
+            updateLoginStatus();
+            showPage("home");
+        }
+
+        // =========================
+        //        ADD QUOTE
+        // =========================
+
         function addQuote(e) {
             e.preventDefault();
+
             if (!loggedInUser) {
                 alert("You must be logged in to add a quote.");
-                showPage('add');
                 return;
             }
 
-            const textEl = document.getElementById('quoteText');
-            const authorEl = document.getElementById('quoteAuthor');
-            const text = textEl.value.trim();
-            const author = authorEl.value.trim() || 'Unknown';
+            const text = document.getElementById("quoteText").value.trim();
+            const author = document.getElementById("quoteAuthor").value.trim() || "Unknown";
 
             if (!text) {
-                alert("Quote text cannot be empty.");
+                alert("Quote cannot be empty.");
                 return;
             }
 
-            const quote = {
-                id: Date.now(),                // unique-ish id
+            quotes.push({
+                id: Date.now(),
                 text,
                 author,
                 votes: 0,
                 date: new Date().toISOString(),
                 submitter: loggedInUser
-            };
+            });
 
-            quotes.push(quote);
-            saveToStorage();
+            saveStorage();
             updateAllDisplays();
 
-            textEl.value = '';
-            authorEl.value = '';
-
-            alert('Quote added successfully! 🎉');
-            showPage('all');
+            alert("Quote added successfully!");
+            showPage("all");
         }
+
+        // =========================
+        //        DELETE QUOTE
+        // =========================
 
         function deleteQuote(id) {
-            const idx = quotes.findIndex(q => q.id === id);
-            if (idx === -1) return;
-            const quote = quotes[idx];
-            if (!loggedInUser || loggedInUser !== quote.submitter) {
-                alert('You can only delete quotes you submitted.');
+            const i = quotes.findIndex(q => q.id === id);
+            if (i === -1) return;
+
+            if (quotes[i].submitter !== loggedInUser) {
+                alert("You can only delete your own quotes.");
                 return;
             }
-            if (!confirm(`Delete quote by ${quote.author}?`)) return;
-            quotes.splice(idx, 1);
-            // Also remove this quote from all userVotes arrays
-            Object.keys(userVotes).forEach(user => {
-                userVotes[user] = userVotes[user].filter(qid => qid !== id);
+
+            if (!confirm("Delete this quote?")) return;
+
+            quotes.splice(i, 1);
+
+            // remove from user votes too
+            Object.keys(userVotes).forEach(u => {
+                if (userVotes[u]) {
+                    userVotes[u] = userVotes[u].filter(qid => qid !== id);
+                }
             });
-            saveToStorage();
+
+            saveStorage();
             updateAllDisplays();
-            alert('Quote deleted.');
         }
 
-        // ---------- Voting (one vote per user per quote) ----------
+        // =========================
+        //          VOTING
+        // =========================
+
         function handleVoteClick(id) {
             if (!loggedInUser) {
-                // encourage login/registration
-                if (confirm("You must be logged in to vote. Go to the Add page to create/login?")) {
-                    showPage('add');
-                }
+                alert("You must be logged in to vote.");
+                showPage("add");
                 return;
             }
             voteQuote(id);
         }
 
         function voteQuote(id) {
-            // Ensure userVotes structure for this user
             if (!userVotes[loggedInUser]) userVotes[loggedInUser] = [];
 
-            // Already voted?
             if (userVotes[loggedInUser].includes(id)) {
-                alert("You already gave a dump click to this quote.");
+                alert("You already voted for this quote 🤦");
                 return;
             }
 
             const quote = quotes.find(q => q.id === id);
             if (!quote) return;
+
             quote.votes++;
             userVotes[loggedInUser].push(id);
 
-            saveToStorage();
+            saveStorage();
             updateAllDisplays();
         }
 
-        // ---------- UI: Pages ----------
-        function showPage(pageName) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            const page = document.getElementById(pageName);
-            if (page) page.classList.add('active');
-
-            const activeBtn = document.querySelector(`.nav-btn[onclick*="showPage('${pageName}')"]`);
-            if (activeBtn) activeBtn.classList.add('active');
-
-            if (pageName === 'add') updateAddPage();
-        }
-
-        function updateAddPage() {
-            const addContent = document.getElementById('addContent');
-            if (loggedInUser) {
-                addContent.innerHTML = `
-                    <div class="add-quote-form">
-                        <h2 style="color: #667eea; margin-bottom: 20px;">Submit a Dumb Quote</h2>
-                        <form onsubmit="addQuote(event)">
-                            <div class="form-group">
-                                <label>Quote:</label>
-                                <textarea id="quoteText" required placeholder="Enter the hilariously dumb quote..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label>Who said it? (Author):</label>
-                                <input type="text" id="quoteAuthor" placeholder="Name of the person">
-                            </div>
-                            <button type="submit" class="submit-btn">Add Quote</button>
-                        </form>
-                    </div>
-                `;
-            } else {
-                addContent.innerHTML = `
-                    <div class="login-page">
-                        <h2>Create Account / Login</h2>
-                        <p style="margin-bottom: 20px; color: #555;">Please log in to post, delete your quotes, and give dump clicks.</p>
-                        <form onsubmit="event.preventDefault(); registerOrLogin();">
-                            <div class="form-group">
-                                <label for="loginUsername">Enter a Username (e.g., Your Name):</label>
-                                <input type="text" id="loginUsername" required placeholder="Choose a username">
-                            </div>
-                            <button type="submit" class="login-btn">Create / Login</button>
-                            <p style="margin-top: 15px; font-size: 0.9em; color: #777;">*Simple client-side accounts stored locally.*</p>
-                        </form>
-                    </div>
-                `;
-            }
-        }
-
-        // ---------- Billboards & Rendering ----------
-        function updateAllDisplays() {
-            updateBillboards();
-            updateAllQuotes();
-        }
+        // =========================
+        //        BILLBOARDS
+        // =========================
 
         function updateBillboards() {
             const weekAgo = new Date();
             weekAgo.setDate(weekAgo.getDate() - 7);
 
             const weekQuotes = quotes.filter(q => new Date(q.date) >= weekAgo);
-            const weekWinner = weekQuotes.sort((a, b) => b.votes - a.votes)[0];
-            const allTimeWinner = [...quotes].sort((a, b) => b.votes - a.votes)[0];
+            const weekWinner = weekQuotes.sort((a,b) => b.votes - a.votes)[0];
+            const allTimeWinner = [...quotes].sort((a,b) => b.votes - a.votes)[0];
 
-            document.getElementById('weekBillboard').innerHTML = weekWinner ? 
-                `<div class="billboard-quote">"${escapeHtml(weekWinner.text)}"</div>
-                 <div class="billboard-author">— ${escapeHtml(weekWinner.author)}</div>
-                 <div class="billboard-votes">🔥 ${weekWinner.votes} dump clicks</div>` :
-                '<div class="empty-state">No quotes this week yet!</div>';
+            document.getElementById("weekBillboard").innerHTML = weekWinner ?
+                `
+                <div class="billboard-quote">"${escapeHtml(weekWinner.text)}"</div>
+                <div style="text-align:right;">— ${escapeHtml(weekWinner.author)}</div>
+                <div style="text-align:center;">🔥 ${weekWinner.votes} dump clicks</div>
+                `
+                :
+                `<div class="billboard-quote">No quotes this week yet!</div>`;
 
-            document.getElementById('allTimeBillboard').innerHTML = allTimeWinner ? 
-                `<div class="billboard-quote">"${escapeHtml(allTimeWinner.text)}"</div>
-                 <div class="billboard-author">— ${escapeHtml(allTimeWinner.author)}</div>
-                 <div class="billboard-votes">🔥 ${allTimeWinner.votes} dump clicks</div>` :
-                '<div class="empty-state">No quotes yet!</div>';
+            document.getElementById("allTimeBillboard").innerHTML = allTimeWinner ?
+                `
+                <div class="billboard-quote">"${escapeHtml(allTimeWinner.text)}"</div>
+                <div style="text-align:right;">— ${escapeHtml(allTimeWinner.author)}</div>
+                <div style="text-align:center;">🔥 ${allTimeWinner.votes} dump clicks</div>
+                `
+                :
+                `<div class="billboard-quote">No quotes yet!</div>`;
+        }
+
+        // =========================
+        //        QUOTE LISTS
+        // =========================
+
+        function updateAllDisplays() {
+            updateBillboards();
+            updateAllQuotes();
         }
 
         function updateAllQuotes() {
-            // Sort: highest votes first, newest as tie-breaker
-            const sorted = [...quotes].sort((a,b) => {
-                if (b.votes !== a.votes) return b.votes - a.votes;
-                return new Date(b.date) - new Date(a.date);
-            });
+            const sorted = [...quotes].sort((a,b) => b.votes - a.votes);
 
-            const quoteHTML = sorted.map(quote => {
-                const isSubmitter = loggedInUser && loggedInUser === quote.submitter;
-                const userHasVoted = loggedInUser && userVotes[loggedInUser] && userVotes[loggedInUser].includes(quote.id);
-
-                // Vote button: disable if user already voted
-                const voteBtnText = userHasVoted ? 'Voted ✓' : 'Vote as Dumb 🤦';
-                const voteDisabled = userHasVoted ? 'disabled' : '';
-                const voteOnclick = userHasVoted ? '' : `onclick="handleVoteClick(${quote.id})"`;
-
-                const deleteButton = isSubmitter ? `<button class="delete-btn" onclick="deleteQuote(${quote.id})">Delete 🗑️</button>` : '';
+            const html = sorted.map(q => {
+                const isSubmitter = loggedInUser === q.submitter;
+                const hasVoted = loggedInUser &&
+                                 userVotes[loggedInUser] &&
+                                 userVotes[loggedInUser].includes(q.id);
 
                 return `
                     <div class="quote-card">
-                        <div class="quote-text">"${escapeHtml(quote.text)}"</div>
-                        <div class="quote-author">— ${escapeHtml(quote.author)}</div>
-                        <div class="quote-actions">
-                            <div class="vote-actions">
-                                <button class="vote-btn" ${voteDisabled} ${voteOnclick}>${voteBtnText}</button>
-                                <span class="vote-count">${quote.votes} dump clicks</span>
-                            </div>
-                            ${deleteButton}
+                        <div style="font-style:italic;font-size:1.1em;">"${escapeHtml(q.text)}"</div>
+                        <div style="color:#667eea;font-weight:bold;margin:8px 0;">
+                            — ${escapeHtml(q.author)}
                         </div>
-                        <div style="margin-top:10px; font-size:0.9em; color:#777;">Submitted by: ${escapeHtml(quote.submitter)} • ${new Date(quote.date).toLocaleString()}</div>
+
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            
+                            <div>
+                                <button 
+                                    class="vote-btn"
+                                    ${hasVoted ? "disabled" : ""}
+                                    onclick="handleVoteClick(${q.id})">
+                                    ${hasVoted ? "Voted ✓" : "Vote as Dumb 🤦"}
+                                </button>
+                                <span style="font-weight:bold;color:#764ba2; margin-left:10px;">
+                                    ${q.votes} dump clicks
+                                </span>
+                            </div>
+
+                            ${isSubmitter 
+                                ? `<button class="delete-btn" onclick="deleteQuote(${q.id})">Delete 🗑️</button>`
+                                : ""}
+                        </div>
+
+                        <div style="margin-top:10px;font-size:0.9em;color:#777;">
+                            Submitted by: ${escapeHtml(q.submitter)}
+                        </div>
                     </div>
                 `;
-            }).join('');
+            }).join("");
 
-            const emptyState = '<div class="empty-state">No quotes yet! Be the first to add one!</div>';
-            const homeContainer = document.getElementById('homeQuotes');
-            const allContainer = document.getElementById('allQuotes');
+            const emptyState = `<div style="color:white;text-align:center;">No quotes yet!</div>`;
 
-            if (quotes.length === 0) {
-                homeContainer.innerHTML = emptyState;
-                allContainer.innerHTML = emptyState;
-                return;
-            }
+            const homeContainer = document.getElementById("homeQuotes");
+            const allContainer = document.getElementById("allQuotes");
 
-            homeContainer.innerHTML = quoteHTML;
-            allContainer.innerHTML = quoteHTML;
+            if(homeContainer) homeContainer.innerHTML = quotes.length ? html : emptyState;
+            if(allContainer) allContainer.innerHTML = quotes.length ? html : emptyState;
         }
 
-        // ---------- Helpers ----------
-        function escapeHtml(unsafe) {
-            if (typeof unsafe !== 'string') return unsafe;
-            return unsafe.replace(/[&<"'>]/g, function(m) {
-                switch (m) {
-                    case '&': return '&amp;';
-                    case '<': return '&lt;';
-                    case '>': return '&gt;';
-                    case '"': return '&quot;';
-                    case "'": return '&#039;';
-                    default: return m;
-                }
-            });
+        // =========================
+        //          HELPERS
+        // =========================
+
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/[&<>"']/g, m => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;",
+                '"': "&quot;", "'": "&#039;"
+            }[m]));
         }
-
-        // Expose registerOrLogin to the form
-        window.registerOrLogin = registerOrLogin;
-
-        // Make sure in-memory state is saved before unload (extra safety)
-        window.addEventListener('beforeunload', saveToStorage);
-
     </script>
 </body>
 </html>
-// =========================
-//  APP STATE + STORAGE
-// =========================
-
-let quotes = [];
-let accounts = []; // [{username:"x",password:"y"}]
-let userVotes = {}; // { username: [quoteIds] }
-let loggedInUser = null;
-
-function loadStorage() {
-    quotes = JSON.parse(localStorage.getItem("dumbQuotes") || "[]");
-    accounts = JSON.parse(localStorage.getItem("accounts") || "[]");
-    userVotes = JSON.parse(localStorage.getItem("userVotes") || "{}");
-    loggedInUser = localStorage.getItem("loggedInUser") || null;
-}
-
-function saveStorage() {
-    localStorage.setItem("dumbQuotes", JSON.stringify(quotes));
-    localStorage.setItem("accounts", JSON.stringify(accounts));
-    localStorage.setItem("userVotes", JSON.stringify(userVotes));
-
-    if (loggedInUser)
-        localStorage.setItem("loggedInUser", loggedInUser);
-    else
-        localStorage.removeItem("loggedInUser");
-}
-
-function initApp() {
-    loadStorage();
-    updateLoginStatus();
-    updateAllDisplays();
-}
-
-
-// =========================
-//      PASSWORD HASH
-// =========================
-
-// simple safe local hash for browser projects
-function hashPassword(str) {
-    return btoa(str); 
-}
-
-
-// =========================
-//      LOGIN STATUS BAR
-// =========================
-
-function updateLoginStatus() {
-    const bar = document.getElementById("userStatus");
-
-    if (loggedInUser) {
-        bar.innerHTML = `Logged in as <b>${loggedInUser}</b> 
-            <button onclick="logout()" style="background:#e74c3c;color:white;border:none;padding:5px 10px;border-radius:8px;">Logout</button>`;
-    } else {
-        bar.innerHTML = `<span style="opacity:0.9;">Not Logged In</span>`;
-    }
-
-    updateAddPage();
-    updateAllQuotes();
-}
-
-function logout() {
-    loggedInUser = null;
-    saveStorage();
-    updateLoginStatus();
-    showPage("home");
-}
-
-
-// =========================
-//     SHOW PAGES
-// =========================
-
-function showPage(name) {
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-
-    document.getElementById(name).classList.add("active");
-
-    const btn = document.querySelector(`.nav-btn[onclick="showPage('${name}')"]`);
-    if (btn) btn.classList.add("active");
-
-    if (name === "add") updateAddPage();
-}
-
-
-// =========================
-//     REGISTER + LOGIN
-// =========================
-
-function updateAddPage() {
-    const div = document.getElementById("addContent");
-
-    if (!loggedInUser) {
-        div.innerHTML = `
-            <div class="login-page">
-                <h2>Login / Create Account</h2>
-
-                <form onsubmit="event.preventDefault(); registerOrLogin();">
-
-                    <div class="form-group">
-                        <label>Username:</label>
-                        <input id="loginUsername" type="text" required placeholder="Choose a username">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Password:</label>
-                        <input id="loginPassword" type="password" required placeholder="Enter a password">
-                    </div>
-
-                    <button class="login-btn" type="submit">Continue</button>
-
-                    <p style="font-size:0.9em;margin-top:10px;color:#555;">
-                        *Accounts stored safely in your browser*
-                    </p>
-                </form>
-            </div>
-        `;
-        return;
-    }
-
-    // if logged in
-    div.innerHTML = `
-        <div class="add-quote-form">
-            <h2 style="color:#667eea;margin-bottom:20px;">Submit a Dumb Quote</h2>
-
-            <form onsubmit="addQuote(event)">
-                <div class="form-group">
-                    <label>Quote:</label>
-                    <textarea id="quoteText" required placeholder="Enter the dumb quote..."></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Author:</label>
-                    <input id="quoteAuthor" type="text" placeholder="Who said it?">
-                </div>
-
-                <button class="submit-btn" type="submit">Add Quote</button>
-            </form>
-        </div>
-    `;
-}
-
-
-function registerOrLogin() {
-    const username = document.getElementById("loginUsername").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
-
-    if (!username || !password) {
-        alert("Please fill all fields.");
-        return;
-    }
-
-    const hashed = hashPassword(password);
-
-    let account = accounts.find(acc => acc.username === username);
-
-    if (!account) {
-        // Create new account
-        accounts.push({ username, password: hashed });
-        loggedInUser = username;
-        alert("Account created! Logged in.");
-    } else {
-        // Login attempt
-        if (account.password !== hashed) {
-            alert("Incorrect password ❌");
-            return;
-        }
-        loggedInUser = username;
-        alert("Logged in successfully ✔️");
-    }
-
-    saveStorage();
-    updateLoginStatus();
-    showPage("home");
-}
-
-
-// =========================
-//        ADD QUOTE
-// =========================
-
-function addQuote(e) {
-    e.preventDefault();
-
-    if (!loggedInUser) {
-        alert("You must be logged in to add a quote.");
-        return;
-    }
-
-    const text = document.getElementById("quoteText").value.trim();
-    const author = document.getElementById("quoteAuthor").value.trim() || "Unknown";
-
-    if (!text) {
-        alert("Quote cannot be empty.");
-        return;
-    }
-
-    quotes.push({
-        id: Date.now(),
-        text,
-        author,
-        votes: 0,
-        date: new Date().toISOString(),
-        submitter: loggedInUser
-    });
-
-    saveStorage();
-    updateAllDisplays();
-
-    alert("Quote added successfully!");
-    showPage("all");
-}
-
-
-// =========================
-//        DELETE QUOTE
-// =========================
-
-function deleteQuote(id) {
-    const i = quotes.findIndex(q => q.id === id);
-    if (i === -1) return;
-
-    if (quotes[i].submitter !== loggedInUser) {
-        alert("You can only delete your own quotes.");
-        return;
-    }
-
-    if (!confirm("Delete this quote?")) return;
-
-    quotes.splice(i, 1);
-
-    // remove from user votes too
-    Object.keys(userVotes).forEach(u => {
-        userVotes[u] = userVotes[u].filter(qid => qid !== id);
-    });
-
-    saveStorage();
-    updateAllDisplays();
-}
-// =========================
-//         VOTING
-// =========================
-
-function handleVoteClick(id) {
-    if (!loggedInUser) {
-        alert("You must be logged in to vote.");
-        showPage("add");
-        return;
-    }
-    voteQuote(id);
-}
-
-function voteQuote(id) {
-    if (!userVotes[loggedInUser]) userVotes[loggedInUser] = [];
-
-    if (userVotes[loggedInUser].includes(id)) {
-        alert("You already voted for this quote 🤦");
-        return;
-    }
-
-    const quote = quotes.find(q => q.id === id);
-    if (!quote) return;
-
-    quote.votes++;
-    userVotes[loggedInUser].push(id);
-
-    saveStorage();
-    updateAllDisplays();
-}
-
-
-// =========================
-//       BILLBOARDS
-// =========================
-
-function updateBillboards() {
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    const weekQuotes = quotes.filter(q => new Date(q.date) >= weekAgo);
-    const weekWinner = weekQuotes.sort((a,b) => b.votes - a.votes)[0];
-    const allTimeWinner = [...quotes].sort((a,b) => b.votes - a.votes)[0];
-
-    document.getElementById("weekBillboard").innerHTML = weekWinner ?
-        `
-        <div class="billboard-quote">"${escapeHtml(weekWinner.text)}"</div>
-        <div style="text-align:right;">— ${escapeHtml(weekWinner.author)}</div>
-        <div style="text-align:center;">🔥 ${weekWinner.votes} dump clicks</div>
-        `
-        :
-        `<div class="billboard-quote">No quotes this week yet!</div>`;
-
-    document.getElementById("allTimeBillboard").innerHTML = allTimeWinner ?
-        `
-        <div class="billboard-quote">"${escapeHtml(allTimeWinner.text)}"</div>
-        <div style="text-align:right;">— ${escapeHtml(allTimeWinner.author)}</div>
-        <div style="text-align:center;">🔥 ${allTimeWinner.votes} dump clicks</div>
-        `
-        :
-        `<div class="billboard-quote">No quotes yet!</div>`;
-}
-
-
-// =========================
-//       QUOTE LISTS
-// =========================
-
-function updateAllDisplays() {
-    updateBillboards();
-    updateAllQuotes();
-}
-
-function updateAllQuotes() {
-    const sorted = [...quotes].sort((a,b) => b.votes - a.votes);
-
-    const html = sorted.map(q => {
-        const isSubmitter = loggedInUser === q.submitter;
-        const hasVoted = loggedInUser &&
-                         userVotes[loggedInUser] &&
-                         userVotes[loggedInUser].includes(q.id);
-
-        return `
-            <div class="quote-card">
-                <div style="font-style:italic;font-size:1.1em;">"${escapeHtml(q.text)}"</div>
-                <div style="color:#667eea;font-weight:bold;margin:8px 0;">
-                    — ${escapeHtml(q.author)}
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    
-                    <div>
-                        <button 
-                            class="vote-btn"
-                            ${hasVoted ? "disabled" : ""}
-                            onclick="handleVoteClick(${q.id})">
-                            ${hasVoted ? "Voted ✓" : "Vote as Dumb 🤦"}
-                        </button>
-                        <span style="font-weight:bold;color:#764ba2;">
-                            ${q.votes} dump clicks
-                        </span>
-                    </div>
-
-                    ${isSubmitter 
-                        ? `<button class="delete-btn" onclick="deleteQuote(${q.id})">Delete 🗑️</button>`
-                        : ""}
-                </div>
-
-                <div style="margin-top:10px;font-size:0.9em;color:#777;">
-                    Submitted by: ${escapeHtml(q.submitter)}
-                </div>
-            </div>
-        `;
-    }).join("");
-
-    const emptyState = `<div style="color:white;text-align:center;">No quotes yet!</div>`;
-
-    document.getElementById("homeQuotes").innerHTML = quotes.length ? html : emptyState;
-    document.getElementById("allQuotes").innerHTML = quotes.length ? html : emptyState;
-}
-
-
-// =========================
-//          HELPERS
-// =========================
-
-function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, m => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;",
-        '"': "&quot;", "'": "&#039;"
-    }[m]));
-}
-
-</script>
-</body>
-</html>
-
